@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TLM Contact Resistance Analyzer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#1B2023;
+    --panel:#232A2E;
+    --panel-alt:#1D2326;
+    --border:#3A4247;
+    --text:#EDEAE4;
+    --text-dim:#93999E;
+    --accent:#E2A33D;
+    --accent-soft:#8A6A2F;
+    --accent2:#4FA8A0;
+    --danger:#D9694F;
+    --font-sans: -apple-system, "Segoe UI", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", "Noto Sans Mono", monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  .container{max-width:1180px;margin:0 auto;padding:44px 24px 72px;}
+
+  header{margin-bottom:34px;}
+  header h1{
+    font-size:26px;
+    font-weight:700;
+    margin:0 0 8px;
+    letter-spacing:-0.01em;
+  }
+  header p{
+    color:var(--text-dim);
+    font-size:14.5px;
+    line-height:1.6;
+    margin:0 0 14px;
+    max-width:640px;
+  }
+  .w-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-family:var(--font-mono);
+    font-size:12.5px;
+    color:var(--text);
+    background:var(--panel);
+    border:1px solid var(--border);
+    padding:6px 12px;
+    border-radius:3px;
+  }
+  .w-badge span{color:var(--text-dim);}
+
+  .main-grid{display:grid;grid-template-columns:380px 1fr;gap:28px;align-items:start;}
+  @media (max-width:900px){.main-grid{grid-template-columns:1fr;}}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:3px;
+    padding:18px 20px;
+  }
+
+  .section-label{
+    font-size:13px;
+    color:var(--text-dim);
+    margin:0 0 14px;
+    line-height:1.6;
+  }
+
+  .input-stack{display:flex;flex-direction:column;gap:12px;}
+
+  .channel-panel .channel-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+  }
+  .channel-panel .channel-head .name{font-weight:600;font-size:14.5px;}
+  .channel-panel .channel-head .len{
+    font-family:var(--font-mono);
+    font-size:12.5px;
+    color:var(--text-dim);
+  }
+  textarea{
+    width:100%;
+    min-height:84px;
+    resize:vertical;
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    border-radius:2px;
+    color:var(--text);
+    font-family:var(--font-mono);
+    font-size:12px;
+    line-height:1.55;
+    padding:10px;
+  }
+  textarea:focus-visible, button:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:1px;
+  }
+  .io-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .io-cell label{display:block;font-size:12px;color:var(--text-dim);margin-bottom:5px;}
+  .io-cell textarea{min-height:96px;}
+
+  .head-left{display:flex;align-items:baseline;gap:10px;}
+  .toggle{position:relative;display:inline-block;width:34px;height:20px;flex-shrink:0;}
+  .toggle input{opacity:0;width:0;height:0;position:absolute;}
+  .toggle .slider{position:absolute;inset:0;background:var(--border);border-radius:20px;cursor:pointer;transition:background 0.15s;}
+  .toggle .slider::before{content:"";position:absolute;height:14px;width:14px;left:3px;top:3px;background:var(--text-dim);border-radius:50%;transition:transform 0.15s, background 0.15s;}
+  .toggle input:checked + .slider{background:var(--accent-soft);}
+  .toggle input:checked + .slider::before{background:var(--accent);transform:translateX(14px);}
+  .toggle input:focus-visible + .slider{outline:2px solid var(--accent);outline-offset:1px;}
+  .channel-panel.is-off{opacity:0.5;}
+  .table-scroll{overflow-x:auto;}
+  tbody th{
+    text-align:left;
+    font-weight:600;
+    font-size:12.5px;
+    color:var(--text-dim);
+    padding:10px 18px 10px 0;
+    border-bottom:1px solid var(--border);
+    white-space:nowrap;
+    background:var(--panel);
+    position:sticky;
+    left:0;
+  }
+  .meta-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:6px;
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    color:var(--text-dim);
+  }
+  .t-input-wrap{display:flex;align-items:center;gap:4px;}
+  .t-input{
+    width:64px;
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    border-radius:2px;
+    color:var(--text);
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    padding:3px 6px;
+  }
+  .t-input:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+  .channel-result{
+    margin-top:8px;
+    padding-top:8px;
+    border-top:1px solid var(--border);
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--accent2);
+    display:none;
+  }
+  .channel-result.show{display:block;}
+
+  .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;}
+  button{
+    font-family:var(--font-sans);
+    font-size:13.5px;
+    cursor:pointer;
+    padding:11px 18px;
+    border-radius:3px;
+    border:1px solid transparent;
+    transition:filter 0.15s, background 0.15s;
+  }
+  #calcBtn{background:var(--accent);color:#1B2023;font-weight:600;border:none;flex:1;}
+  #calcBtn:hover{filter:brightness(1.08);}
+  #exampleBtn{background:transparent;color:var(--text-dim);border:1px solid var(--border);}
+  #exampleBtn:hover{color:var(--text);border-color:var(--text-dim);}
+  #resetBtn{background:transparent;color:var(--text-dim);border:1px solid var(--border);}
+  #resetBtn:hover{color:var(--text);border-color:var(--text-dim);}
+
+  .error-msg{
+    display:none;
+    margin-top:12px;
+    font-size:13px;
+    color:var(--danger);
+    line-height:1.6;
+  }
+  .error-msg.show{display:block;}
+
+  .right-col{display:flex;flex-direction:column;gap:20px;}
+
+  .chart-panel{background:var(--panel-alt);box-shadow:inset 0 0 0 1px var(--border);}
+  .chart-wrap{position:relative;height:340px;}
+  #chartPlaceholder{
+    position:absolute;inset:0;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--text-dim);font-size:13.5px;text-align:center;padding:20px;
+  }
+  #rtChart{display:none;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{
+    text-align:left;
+    font-weight:600;
+    font-size:12.5px;
+    color:var(--text-dim);
+    padding:0 18px 10px 0;
+    border-bottom:1px solid var(--border);
+    white-space:nowrap;
+  }
+  tbody td{
+    padding:10px 18px 10px 0;
+    border-bottom:1px solid var(--border);
+    font-family:var(--font-mono);
+    font-size:12.5px;
+    white-space:nowrap;
+  }
+  tbody tr:last-child td, tbody tr:last-child th{border-bottom:none;}
+
+  .readout-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    margin-bottom:18px;
+  }
+  @media (max-width:520px){.readout-grid{grid-template-columns:1fr;}}
+  .conductivity-block{margin-bottom:18px;}
+  .conductivity-block table{font-size:12px;}
+  .conductivity-block .section-label{margin-bottom:10px;}
+  .metric{
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    border-radius:3px;
+    padding:14px 16px;
+  }
+  .metric .m-label{font-size:12.5px;color:var(--text-dim);margin-bottom:6px;}
+  .metric .m-value{font-family:var(--font-mono);font-size:22px;color:var(--accent);}
+  .metric .m-sub{font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);margin-top:3px;}
+
+  .equation-line{
+    font-family:var(--font-mono);
+    font-size:14.5px;
+    color:var(--text);
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    border-radius:3px;
+    padding:12px 14px;
+    margin-bottom:10px;
+    word-break:break-word;
+  }
+  .formula-ref{
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--text-dim);
+    line-height:1.7;
+  }
+
+  h2.panel-title{font-size:15px;margin:0 0 14px;font-weight:600;}
+  .chart-panel-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:14px;
+  }
+  .chart-panel-head h2.panel-title{margin:0;}
+  .mini-btn{
+    font-family:var(--font-sans);
+    font-size:12px;
+    background:transparent;
+    color:var(--text-dim);
+    border:1px solid var(--border);
+    padding:6px 12px;
+    border-radius:3px;
+    cursor:pointer;
+    transition:color 0.15s, border-color 0.15s;
+  }
+  .mini-btn:hover:not(:disabled){color:var(--text);border-color:var(--text-dim);}
+  .mini-btn:disabled{opacity:0.4;cursor:not-allowed;}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>TLM Contact Resistance Analyzer</h1>
+    <p>Computes the resistance of each channel from its I–V data, then extracts sheet resistance (R_sh), contact resistance (R_C), transfer length (L_T) and specific contact resistivity (ρ_C) from a linear fit of R_total vs. L. Current is assumed to be in A (amperes) and voltage in V.</p>
+    <div class="w-badge"><span>W</span> = 4000 μm (fixed)</div>
+  </header>
+
+  <div class="main-grid">
+
+    <!-- LEFT: inputs -->
+    <div class="input-stack">
+      <p class="section-label">Use the switch on each Column to enable or disable it. For every enabled Column, enter voltage (V) [V] and current (I) [A] with the same number of points — there is no need for 101 points or the full 0–10&nbsp;V range (e.g. you can enter only 0–1.5&nbsp;V). At least 2 Columns must be enabled.</p>
+
+      <div class="panel channel-panel" id="panel1" data-l="200">
+        <div class="channel-head">
+          <div class="head-left"><span class="name">Column 1</span><span class="len">L = 200 μm</span></div>
+          <label class="toggle"><input type="checkbox" id="en1" checked><span class="slider"></span></label>
+        </div>
+        <div class="io-grid">
+          <div class="io-cell"><label for="v1">Voltage V [V]</label><textarea id="v1" placeholder="Voltage values, separated by newline, comma or space"></textarea></div>
+          <div class="io-cell"><label for="col1">Current I [A]</label><textarea id="col1" placeholder="Current values, separated by newline, comma or space"></textarea></div>
+        </div>
+        <div class="meta-row">
+          <span id="count1">V 0 pts / I 0 pts</span>
+          <span class="t-input-wrap">t = <input type="text" inputmode="decimal" id="t1" class="t-input" placeholder="e.g. 500"> nm</span>
+        </div>
+        <div class="channel-result" id="res1"></div>
+      </div>
+
+      <div class="panel channel-panel" id="panel2" data-l="400">
+        <div class="channel-head">
+          <div class="head-left"><span class="name">Column 2</span><span class="len">L = 400 μm</span></div>
+          <label class="toggle"><input type="checkbox" id="en2" checked><span class="slider"></span></label>
+        </div>
+        <div class="io-grid">
+          <div class="io-cell"><label for="v2">Voltage V [V]</label><textarea id="v2" placeholder="Voltage values, separated by newline, comma or space"></textarea></div>
+          <div class="io-cell"><label for="col2">Current I [A]</label><textarea id="col2" placeholder="Current values, separated by newline, comma or space"></textarea></div>
+        </div>
+        <div class="meta-row">
+          <span id="count2">V 0 pts / I 0 pts</span>
+          <span class="t-input-wrap">t = <input type="text" inputmode="decimal" id="t2" class="t-input" placeholder="e.g. 500"> nm</span>
+        </div>
+        <div class="channel-result" id="res2"></div>
+      </div>
+
+      <div class="panel channel-panel" id="panel3" data-l="600">
+        <div class="channel-head">
+          <div class="head-left"><span class="name">Column 3</span><span class="len">L = 600 μm</span></div>
+          <label class="toggle"><input type="checkbox" id="en3" checked><span class="slider"></span></label>
+        </div>
+        <div class="io-grid">
+          <div class="io-cell"><label for="v3">Voltage V [V]</label><textarea id="v3" placeholder="Voltage values, separated by newline, comma or space"></textarea></div>
+          <div class="io-cell"><label for="col3">Current I [A]</label><textarea id="col3" placeholder="Current values, separated by newline, comma or space"></textarea></div>
+        </div>
+        <div class="meta-row">
+          <span id="count3">V 0 pts / I 0 pts</span>
+          <span class="t-input-wrap">t = <input type="text" inputmode="decimal" id="t3" class="t-input" placeholder="e.g. 500"> nm</span>
+        </div>
+        <div class="channel-result" id="res3"></div>
+      </div>
+
+      <div class="panel channel-panel" id="panel4" data-l="800">
+        <div class="channel-head">
+          <div class="head-left"><span class="name">Column 4</span><span class="len">L = 800 μm</span></div>
+          <label class="toggle"><input type="checkbox" id="en4" checked><span class="slider"></span></label>
+        </div>
+        <div class="io-grid">
+          <div class="io-cell"><label for="v4">Voltage V [V]</label><textarea id="v4" placeholder="Voltage values, separated by newline, comma or space"></textarea></div>
+          <div class="io-cell"><label for="col4">Current I [A]</label><textarea id="col4" placeholder="Current values, separated by newline, comma or space"></textarea></div>
+        </div>
+        <div class="meta-row">
+          <span id="count4">V 0 pts / I 0 pts</span>
+          <span class="t-input-wrap">t = <input type="text" inputmode="decimal" id="t4" class="t-input" placeholder="e.g. 500"> nm</span>
+        </div>
+        <div class="channel-result" id="res4"></div>
+      </div>
+
+      <div class="panel channel-panel" id="panel5" data-l="1000">
+        <div class="channel-head">
+          <div class="head-left"><span class="name">Column 5</span><span class="len">L = 1000 μm</span></div>
+          <label class="toggle"><input type="checkbox" id="en5" checked><span class="slider"></span></label>
+        </div>
+        <div class="io-grid">
+          <div class="io-cell"><label for="v5">Voltage V [V]</label><textarea id="v5" placeholder="Voltage values, separated by newline, comma or space"></textarea></div>
+          <div class="io-cell"><label for="col5">Current I [A]</label><textarea id="col5" placeholder="Current values, separated by newline, comma or space"></textarea></div>
+        </div>
+        <div class="meta-row">
+          <span id="count5">V 0 pts / I 0 pts</span>
+          <span class="t-input-wrap">t = <input type="text" inputmode="decimal" id="t5" class="t-input" placeholder="e.g. 500"> nm</span>
+        </div>
+        <div class="channel-result" id="res5"></div>
+      </div>
+
+      <div class="actions">
+        <button id="calcBtn">Calculate</button>
+        <button id="exampleBtn">Fill example data</button>
+        <button id="resetBtn">Reset</button>
+      </div>
+      <div class="error-msg" id="errorMsg"></div>
+    </div>
+
+    <!-- RIGHT: results -->
+    <div class="right-col">
+
+      <div class="panel chart-panel">
+        <div class="chart-panel-head">
+          <h2 class="panel-title">R_total – L</h2>
+          <button id="downloadChartBtn" class="mini-btn" disabled>Save as PNG</button>
+        </div>
+        <div class="chart-wrap">
+          <div id="chartPlaceholder">Press Calculate to show the R_total–L plot and linear fit.</div>
+          <canvas id="rtChart"></canvas>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel-title">Results per channel</h2>
+        <p class="section-label">Drag-select a row to paste it straight into Excel.</p>
+        <div class="table-scroll">
+          <table id="resultsTable"><tbody><tr><th>Column</th><td>—</td></tr></tbody></table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel-title">Extracted parameters</h2>
+        <div class="readout-grid">
+          <div class="metric">
+            <div class="m-label">Sheet resistance R_sh</div>
+            <div class="m-value" id="outRsh">—</div>
+            <div class="m-sub">Ω/□</div>
+          </div>
+          <div class="metric">
+            <div class="m-label">Contact resistance R_C</div>
+            <div class="m-value" id="outRc">—</div>
+            <div class="m-sub">Ω</div>
+          </div>
+          <div class="metric">
+            <div class="m-label">Transfer length L_T</div>
+            <div class="m-value" id="outLt">—</div>
+            <div class="m-sub">μm</div>
+          </div>
+          <div class="metric">
+            <div class="m-label">Specific contact resistivity ρ_C</div>
+            <div class="m-value" id="outRho">—</div>
+            <div class="m-sub" id="outRhoSub">Ω·μm²</div>
+          </div>
+        </div>
+
+        <div class="conductivity-block">
+          <p class="section-label">Conductivity per channel (S/cm) — intrinsic conductivity σ_0 (from R_sh, t) and effective conductivity σ_eff (from R_total, t). Drag-select a row to paste it straight into Excel.</p>
+          <div class="table-scroll">
+            <table id="sigmaTable"><tbody><tr><th>Column</th><td>—</td></tr></tbody></table>
+          </div>
+        </div>
+
+        <div class="equation-line" id="equationLine">R_total(L) = —</div>
+        <div class="formula-ref">
+          R_total(L) = (R_sh/W)·L + 2R_C = (R_sh/W)·(L + 2L_T)<br>
+          ρ_C = R_C · L_T · W<br>
+          σ_0 = 1 / (R_sh · t)&nbsp;&nbsp;[S/m, displayed ×0.01 as S/cm]<br>
+          σ_eff = L / (R_total · W · t)&nbsp;&nbsp;[S/m, displayed ×0.01 as S/cm]
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const W_FIXED = 4000; // μm, fixed
+const L_VALUES = [200, 400, 600, 800, 1000];
+let chartInstance = null;
+
+function parseColumn(text){
+  return text.split(/[\s,;]+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 0)
+    .map(Number)
+    .filter(n => !isNaN(n));
+}
+
+function linreg(xs, ys){
+  const n = xs.length;
+  let sx=0, sy=0, sxy=0, sxx=0;
+  for(let i=0;i<n;i++){
+    sx += xs[i]; sy += ys[i];
+    sxy += xs[i]*ys[i]; sxx += xs[i]*xs[i];
+  }
+  const denom = n*sxx - sx*sx;
+  if (denom === 0) return {slope: NaN, intercept: NaN};
+  const slope = (n*sxy - sx*sy) / denom;
+  const intercept = (sy - slope*sx) / n;
+  return {slope, intercept};
+}
+
+function fmtSig(x, sig){
+  if (x === null || x === undefined || !isFinite(x)) return '—';
+  return new Intl.NumberFormat('en-US', {maximumSignificantDigits: sig || 4}).format(x);
+}
+function fmtSci(x, sig){
+  if (x === null || x === undefined || !isFinite(x)) return '—';
+  return new Intl.NumberFormat('en-US', {notation:'scientific', maximumSignificantDigits: sig || 4}).format(x);
+}
+
+// live count of parsed values per textarea (voltage / current)
+for(let i=1;i<=5;i++){
+  const vEl = document.getElementById('v'+i);
+  const iEl = document.getElementById('col'+i);
+  const cnt = document.getElementById('count'+i);
+  const update = () => {
+    cnt.textContent = 'V ' + parseColumn(vEl.value).length + ' pts / I ' + parseColumn(iEl.value).length + ' pts';
+  };
+  vEl.addEventListener('input', update);
+  iEl.addEventListener('input', update);
+}
+
+// per-channel enable/disable toggle
+function setChannelEnabled(i, on){
+  document.getElementById('en'+i).checked = on;
+  document.getElementById('panel'+i).classList.toggle('is-off', !on);
+  document.getElementById('v'+i).disabled = !on;
+  document.getElementById('col'+i).disabled = !on;
+  document.getElementById('t'+i).disabled = !on;
+}
+for(let i=1;i<=5;i++){
+  document.getElementById('en'+i).addEventListener('change', (e) => setChannelEnabled(i, e.target.checked));
+}
+
+function showError(msg){
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+function clearError(){
+  const el = document.getElementById('errorMsg');
+  el.textContent = '';
+  el.classList.remove('show');
+}
+
+function calculate(){
+  clearError();
+  const channelData = [];
+
+  for(let i=1;i<=5;i++){
+    const resEl = document.getElementById('res'+i);
+
+    if (!document.getElementById('en'+i).checked){
+      // channel switched off — skip it
+      resEl.textContent = '';
+      resEl.classList.remove('show');
+      continue;
+    }
+
+    const iEl = document.getElementById('col'+i);
+    const vEl = document.getElementById('v'+i);
+    const tEl = document.getElementById('t'+i);
+    const rawI = iEl.value.trim();
+    const rawV = vEl.value.trim();
+    const tRaw = tEl.value.trim();
+
+    if (rawI === '' && rawV === '' && tRaw === ''){
+      showError('Column ' + i + ' is enabled but empty. Enter data or switch it off to exclude it.');
+      return;
+    }
+
+    const currents = parseColumn(rawI);
+    const volts = parseColumn(rawV);
+    if (volts.length < 2 || currents.length < 2){
+      showError('Column ' + i + ' needs at least 2 voltage and 2 current values.');
+      return;
+    }
+    if (volts.length !== currents.length){
+      showError('Column ' + i + ': voltage (' + volts.length + ' pts) and current (' + currents.length + ' pts) counts do not match.');
+      return;
+    }
+    const tVal = parseFloat(tRaw);
+    if (!isFinite(tVal) || tVal <= 0){
+      showError('Column ' + i + ': enter the thickness t (nm).');
+      return;
+    }
+    const {slope, intercept} = linreg(volts, currents);   // slope = Current/Voltage
+    if (!isFinite(slope) || slope === 0){
+      showError('Column ' + i + ': cannot compute the slope. Check whether all voltages are identical or all currents are zero.');
+      return;
+    }
+    const R = 1/slope;
+    channelData.push({colNum: i, slope, R, L: L_VALUES[i-1], n: currents.length, t: tVal});
+
+    resEl.textContent = 'slope = ' + fmtSig(slope,4) + ' A/V   R = ' + fmtSig(R,4) + ' Ω';
+    resEl.classList.add('show');
+  }
+
+  if (channelData.length < 2){
+    showError('Enable at least 2 Columns for the R_total–L linear fit.');
+    return;
+  }
+
+  // R_total vs L fit
+  const Ls = channelData.map(c => c.L);
+  const Rs = channelData.map(c => c.R);
+  const {slope: a, intercept: b} = linreg(Ls, Rs); // a = R_sh/W, b = 2R_C
+
+  if (!isFinite(a) || a === 0){
+    showError('Cannot compute the slope of the R_total–L linear fit.');
+    return;
+  }
+
+  const R_sh = a * W_FIXED;
+  const R_C = b / 2;
+  const L_T = R_C / a;
+  const rho_C_um2 = R_C * L_T * W_FIXED;   // Ω·μm²
+  const rho_C_cm2 = rho_C_um2 * 1e-8;       // Ω·cm²
+
+  // render table (transposed: one row per metric, one column per active channel)
+  const resultsTable = document.getElementById('resultsTable');
+  resultsTable.innerHTML =
+    '<tbody>' +
+    '<tr><th>Column</th>' + channelData.map(c => '<td>Column ' + c.colNum + '</td>').join('') + '</tr>' +
+    '<tr><th>L (μm)</th>' + channelData.map(c => '<td>' + c.L + '</td>').join('') + '</tr>' +
+    '<tr><th>Slope (A/V)</th>' + channelData.map(c => '<td>' + fmtSig(c.slope,4) + '</td>').join('') + '</tr>' +
+    '<tr><th>R_total (Ω)</th>' + channelData.map(c => '<td>' + fmtSig(c.R,4) + '</td>').join('') + '</tr>' +
+    '</tbody>';
+
+  // render readout
+  document.getElementById('outRsh').textContent = fmtSig(R_sh,4);
+  document.getElementById('outRc').textContent = fmtSig(R_C,4);
+  document.getElementById('outLt').textContent = fmtSig(L_T,4);
+  document.getElementById('outRho').textContent = fmtSci(rho_C_um2,4);
+  document.getElementById('outRhoSub').textContent = 'Ω·μm²  (' + fmtSig(rho_C_cm2,4) + ' Ω·cm²)';
+  document.getElementById('equationLine').textContent =
+    'R_total(L) = ' + fmtSig(a,4) + '·L + ' + fmtSig(b,4) + '   (linear fit)';
+
+  // per-channel conductivity: sigma_0 = 1/(R_sh*t), sigma_eff = L/(R_total*W*t)  [S/m internally]
+  // t[nm] -> m: *1e-9,  L,W[μm] -> m: *1e-6,  displayed as S/cm (x0.01)
+  const W_m = W_FIXED * 1e-6;
+  const S_CM = 0.01;
+  const sigmaRows = channelData.map((c) => {
+    const t_m = c.t * 1e-9;
+    const L_m = c.L * 1e-6;
+    const sigma0_Sm = 1 / (R_sh * t_m);
+    const sigmaEff_Sm = L_m / (c.R * W_m * t_m);
+    return {colNum: c.colNum, t: c.t, sigma0: sigma0_Sm * S_CM, sigmaEff: sigmaEff_Sm * S_CM};
+  });
+  const sigmaTable = document.getElementById('sigmaTable');
+  sigmaTable.innerHTML =
+    '<tbody>' +
+    '<tr><th>Column</th>' + sigmaRows.map(r => '<td>Column ' + r.colNum + '</td>').join('') + '</tr>' +
+    '<tr><th>t (nm)</th>' + sigmaRows.map(r => '<td>' + fmtSig(r.t,4) + '</td>').join('') + '</tr>' +
+    '<tr><th>σ_0 (S/cm)</th>' + sigmaRows.map(r => '<td>' + fmtSci(r.sigma0,4) + '</td>').join('') + '</tr>' +
+    '<tr><th>σ_eff (S/cm)</th>' + sigmaRows.map(r => '<td>' + fmtSci(r.sigmaEff,4) + '</td>').join('') + '</tr>' +
+    '</tbody>';
+
+  try{
+    drawChart(Ls, Rs, a, b, L_T);
+  }catch(e){
+    console.error('Chart render failed:', e);
+    document.getElementById('chartPlaceholder').style.display = 'flex';
+    document.getElementById('chartPlaceholder').textContent = 'Chart rendering failed (check that Chart.js has loaded).';
+    document.getElementById('rtChart').style.display = 'none';
+    document.getElementById('downloadChartBtn').disabled = true;
+  }
+}
+
+function drawChart(Ls, Rs, a, b, L_T){
+  document.getElementById('chartPlaceholder').style.display = 'none';
+  const canvas = document.getElementById('rtChart');
+  canvas.style.display = 'block';
+
+  const Lmin = Math.min(...Ls);
+  const Lmax = Math.max(...Ls);
+  const xIntercept = -2 * L_T;
+  const xMin = Math.min(xIntercept - 100, -50);
+  const xMax = Lmax + 150;
+
+  const points = Ls.map((L,i) => ({x:L, y:Rs[i]}));
+  const extrapLine = [{x:xMin, y:a*xMin+b}, {x:Lmin, y:a*Lmin+b}];
+  const mainLine = [{x:Lmin, y:a*Lmin+b}, {x:Lmax, y:a*Lmax+b}];
+
+  const gridColor = '#3A4247';
+  const textColor = '#93999E';
+
+  if (chartInstance) chartInstance.destroy();
+  chartInstance = new Chart(canvas.getContext('2d'), {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {
+          type:'line', label:'Extrapolation',
+          data: extrapLine, borderColor:'#8A6A2F', borderWidth:1.5,
+          borderDash:[5,4], pointRadius:0, order:3
+        },
+        {
+          type:'line', label:'Linear fit',
+          data: mainLine, borderColor:'#E2A33D', borderWidth:2.5,
+          pointRadius:0, order:2
+        },
+        {
+          type:'scatter', label:'Measured',
+          data: points, backgroundColor:'#4FA8A0',
+          pointRadius:6, pointHoverRadius:7, order:1
+        },
+        {
+          type:'scatter', label:'-2L_T (x-intercept)',
+          data: [{x:xIntercept, y:0}], backgroundColor:'#D9694F',
+          pointStyle:'rectRot', pointRadius:6, order:1
+        }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{
+          type:'linear', min:xMin, max:xMax,
+          title:{display:true, text:'L (μm)', color:textColor},
+          ticks:{color:textColor}, grid:{color:gridColor}
+        },
+        y:{
+          title:{display:true, text:'R_total (Ω)', color:textColor},
+          ticks:{color:textColor}, grid:{color:gridColor}
+        }
+      },
+      plugins:{
+        legend:{labels:{color:textColor, boxWidth:12, font:{size:11}}},
+        tooltip:{mode:'nearest', intersect:true}
+      }
+    }
+  });
+
+  document.getElementById('downloadChartBtn').disabled = false;
+}
+
+function fillExample(){
+  const Rsh_target = 50, Rc_target = 20;
+  const a = Rsh_target / W_FIXED;
+  const b = 2 * Rc_target;
+  const exampleT = [480, 500, 510, 495, 505]; // nm, illustrates slight thickness variation
+  for(let i=0;i<5;i++){
+    const L = L_VALUES[i];
+    const R = a*L + b;
+    const slope = 1/R;
+    const vals = [], volts = [];
+    for(let idx=0; idx<=100; idx++){
+      const x = idx/10;   // 0.0 ~ 10.0 V
+      const noise = 1 + (Math.random()-0.5)*0.01;
+      volts.push(x.toFixed(1));
+      vals.push((slope*x*noise).toFixed(6));
+    }
+    document.getElementById('v'+(i+1)).value = volts.join(', ');
+    document.getElementById('col'+(i+1)).value = vals.join(', ');
+    document.getElementById('count'+(i+1)).textContent = 'V ' + volts.length + ' pts / I ' + vals.length + ' pts';
+    document.getElementById('t'+(i+1)).value = exampleT[i];
+    setChannelEnabled(i+1, true);
+  }
+  clearError();
+}
+
+function resetAll(){
+  for(let i=1;i<=5;i++){
+    document.getElementById('col'+i).value = '';
+    document.getElementById('v'+i).value = '';
+    document.getElementById('t'+i).value = '';
+    document.getElementById('count'+i).textContent = 'V 0 pts / I 0 pts';
+    const resEl = document.getElementById('res'+i);
+    resEl.textContent = '';
+    resEl.classList.remove('show');
+    setChannelEnabled(i, true);
+  }
+  document.getElementById('resultsTable').innerHTML = '<tbody><tr><th>Column</th><td>—</td></tr></tbody>';
+  document.getElementById('sigmaTable').innerHTML = '<tbody><tr><th>Column</th><td>—</td></tr></tbody>';
+  ['outRsh','outRc','outLt','outRho'].forEach(id => document.getElementById(id).textContent = '—');
+  document.getElementById('outRhoSub').textContent = 'Ω·μm²';
+  document.getElementById('equationLine').textContent = 'R_total(L) = —';
+  clearError();
+  if (chartInstance){ chartInstance.destroy(); chartInstance = null; }
+  document.getElementById('rtChart').style.display = 'none';
+  document.getElementById('chartPlaceholder').style.display = 'flex';
+  document.getElementById('chartPlaceholder').textContent = 'Press Calculate to show the R_total–L plot and linear fit.';
+  document.getElementById('downloadChartBtn').disabled = true;
+}
+
+function downloadChartPng(){
+  if (!chartInstance) return;
+  const link = document.createElement('a');
+  link.href = chartInstance.toBase64Image('image/png', 1);
+  link.download = 'R_total_vs_L.png';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+document.getElementById('calcBtn').addEventListener('click', calculate);
+document.getElementById('exampleBtn').addEventListener('click', fillExample);
+document.getElementById('resetBtn').addEventListener('click', resetAll);
+document.getElementById('downloadChartBtn').addEventListener('click', downloadChartPng);
+</script>
+</body>
+</html>
